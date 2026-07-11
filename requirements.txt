@@ -1,0 +1,7 @@
+# Multi-Media-Master-Pro (CLI)
+#
+# The CLI application has NO third-party runtime dependencies.
+# It relies only on the Python standard library plus a bundled ffmpeg.exe.
+#
+# Build-time only (installed by the CI workflow / build_cli.bat, not needed at runtime):
+#   pyinstaller

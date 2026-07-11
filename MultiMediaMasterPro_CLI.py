@@ -25,6 +25,39 @@ def setup_logging():
     logging.info("Application started")
     logging.info(f"Log file created at: {log_file}")
 
+def get_config_dir():
+    """
+    Return a per-user, always-writable directory for storing app settings
+    (e.g. the saved screen-recording output path). Using a fixed writable
+    location avoids 'Permission denied' errors that happen when the app runs
+    from a read-only folder such as Program Files.
+    """
+    if os.name == 'nt':
+        base = os.environ.get('APPDATA') or os.path.expanduser('~')
+    else:
+        base = os.environ.get('XDG_CONFIG_HOME') or os.path.join(os.path.expanduser('~'), '.config')
+
+    config_dir = os.path.join(base, 'MultiMediaMasterPro')
+    try:
+        os.makedirs(config_dir, exist_ok=True)
+        return config_dir
+    except Exception as e:
+        logging.error(f"Could not create config directory {config_dir}: {e}")
+        # Fall back to the user's home directory, then the current directory
+        for fallback in (os.path.expanduser('~'), os.getcwd()):
+            try:
+                os.makedirs(fallback, exist_ok=True)
+                return fallback
+            except Exception:
+                continue
+        return os.getcwd()
+
+
+def get_output_dir_file():
+    """Full path to the file that stores the saved screen-recording output path."""
+    return os.path.join(get_config_dir(), 'output_dir.txt')
+
+
 def get_ffmpeg_path():
     """
     Locate ffmpeg.exe in the following order:
@@ -312,11 +345,12 @@ def record_screen():
     second = str(current_datetime.second).zfill(2)
 
     output_directory = None
-    if os.path.exists("output_dir.txt"):    
-        with open("output_dir.txt", 'r') as file:
-            output_directory = file.read()
+    output_dir_file = get_output_dir_file()
+    if os.path.exists(output_dir_file):
+        with open(output_dir_file, 'r') as file:
+            output_directory = file.read().strip()
     else:
-        print(" Output path does not exist!")
+        print(" Output path is not set! Use option [6] to save it first.")
         return
     if output_directory is None or output_directory == '':
         print(" Output path is not given!")
@@ -867,9 +901,10 @@ if __name__ == "__main__":
                 start_time = time.time()
                 record_screen()
                 
-                if os.path.exists("output_dir.txt"):
-                    with open("output_dir.txt", 'r') as file:
-                        output_directory = file.read()
+                output_dir_file = get_output_dir_file()
+                if os.path.exists(output_dir_file):
+                    with open(output_dir_file, 'r') as file:
+                        output_directory = file.read().strip()
                     if output_directory and os.path.isdir(output_directory):
                         print(" Screen recording completed.")
                         print(f" Duration: {(time.time() - start_time):.2f} seconds")
@@ -880,11 +915,15 @@ if __name__ == "__main__":
             elif choice == 6:
                 output_path = input(" Enter output path for screen recording: ").strip()
                 output_path = output_path.replace('"', '')
-                if os.path.exists(output_path):    
-                    with open("output_dir.txt", 'w') as file:
-                        file.write(output_path)
-                    print(" Output path for screen recording is saved!")
-                    logging.info(f"Screen recording output path saved: {output_path}")
+                if os.path.isdir(output_path):
+                    try:
+                        with open(get_output_dir_file(), 'w') as file:
+                            file.write(output_path)
+                        print(" Output path for screen recording is saved!")
+                        logging.info(f"Screen recording output path saved: {output_path}")
+                    except Exception as e:
+                        print(f" Could not save output path: {e}")
+                        logging.error(f"Failed to save output path: {e}")
                 else:
                     print(" Output Path does not exist!")
                     logging.warning(f"Output path does not exist: {output_path}")

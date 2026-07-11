@@ -1,15 +1,27 @@
-# Binary files
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# PyInstaller build output
+build/
+dist/
+*.spec
+
+# Inno Setup / release output
+installer/
 Releases/
 EXE/
 
+# Runtime logs
+*.log
+app_debug.log
 
-# cache files
-__pycache__/
-*.pyc
+# Local per-user config
+output_dir.txt
 
-# batch files
-*.bat
-
-GUI_Version/ 
-readme_md.md 
-
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

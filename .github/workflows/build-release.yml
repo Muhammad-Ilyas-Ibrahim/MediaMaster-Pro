@@ -1,0 +1,126 @@
+name: Build & Release (CLI)
+
+permissions:
+  contents: write
+
+# Versioning is tag-driven: the git tag IS the version.
+#   - Push to main (incl. a merged PR) -> build + upload the installer as an artifact
+#   - Push a tag v*                     -> build + publish a GitHub Release named after the tag
+# Cut a release with:  git tag v3.1 && git push origin v3.1
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          lfs: true          # ffmpeg.exe is stored via Git LFS
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Resolve Version (from git tag)
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/v*') {
+            $v = $env:GITHUB_REF_NAME -replace '^v', ''
+          } else {
+            $v = "0.0.0-dev+$($env:GITHUB_SHA.Substring(0,7))"
+          }
+          "VERSION=$v" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Building version: $v"
+
+      - name: Build EXE (PyInstaller one-folder console app)
+        shell: cmd
+        run: |
+          pyinstaller --onedir --console ^
+            --icon=icon.ico ^
+            --add-data "ffmpeg.exe;." ^
+            --add-data "icon.ico;." ^
+            --clean --noconfirm ^
+            --name "MultiMediaMasterPro" ^
+            MultiMediaMasterPro_CLI.py
+
+      - name: Generate Inno Setup script
+        shell: pwsh
+        run: |
+          $lines = @(
+            '#define MyAppName "MultiMediaMasterPro"',
+            "#define MyAppVersion ""$($env:VERSION)""",
+            '#define MyAppPublisher "Blue Peak Technologies"',
+            '#define MyAppExeName "MultiMediaMasterPro.exe"',
+            '',
+            '[Setup]',
+            'AppId={{3B3DF661-55D6-4B92-A3E3-3177D5A4C277}',
+            'AppName={#MyAppName}',
+            'AppVersion={#MyAppVersion}',
+            'AppPublisher={#MyAppPublisher}',
+            'DefaultDirName={autopf}\MultiMediaMasterPro CLI',
+            'UninstallDisplayIcon={app}\{#MyAppExeName}',
+            'ArchitecturesAllowed=x64compatible',
+            'ArchitecturesInstallIn64BitMode=x64compatible',
+            'DisableProgramGroupPage=yes',
+            'OutputDir=installer',
+            'OutputBaseFilename=MultiMediaMasterPro-CLI-Setup-v{#MyAppVersion}',
+            'SetupIconFile=icon.ico',
+            'SolidCompression=yes',
+            'WizardStyle=modern',
+            '',
+            '[Languages]',
+            'Name: "english"; MessagesFile: "compiler:Default.isl"',
+            '',
+            '[Tasks]',
+            'Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked',
+            '',
+            '[Files]',
+            'Source: "dist\MultiMediaMasterPro\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion',
+            'Source: "dist\MultiMediaMasterPro\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs',
+            '',
+            '[Icons]',
+            'Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"',
+            'Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon',
+            '',
+            '[Run]',
+            'Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,MultiMediaMasterPro}"; Flags: nowait postinstall skipifsilent'
+          )
+          Set-Content -Path installer.iss -Value $lines -Encoding utf8
+          Get-Content installer.iss
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Installer (Inno Setup)
+        shell: cmd
+        run: '"%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" installer.iss'
+
+      - name: Upload Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MultiMediaMasterPro-CLI-Installer
+          path: installer/*.exe
+
+      - name: Create Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: installer/*.exe
+          name: Multi-Media-Master-Pro CLI ${{ github.ref_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
