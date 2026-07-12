@@ -1,4 +1,4 @@
-# <center> Multi-Media-Master-Pro v3.0 </center>
+# <center> Multi-Media-Master-Pro v3.1 </center>
 
 **Multi-Media-Master-Pro** is a versatile media processing tool that offers a range of functionalities including video compression, image compression, screen recording, audio extraction, and media format conversion. It's designed to simplify and enhance your media management tasks, all within a user-friendly interface.
 
@@ -41,8 +41,8 @@ Trim audio or video files by specifying start and end times. This feature uses f
 
 1. **Clone the Repository:**
     ```bash
-    git clone https://github.com/Muhammad-Ilyas-Ibrahim/Multi-Media-Master-Pro.git
-    cd Multi-Media-Master-Pro
+    git clone https://github.com/Muhammad-Ilyas-Ibrahim/Multi-Media-Master-Pro-CLI.git
+    cd Multi-Media-Master-Pro-CLI
     ```
 
 ## Usage
